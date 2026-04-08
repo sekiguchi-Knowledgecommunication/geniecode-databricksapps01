@@ -1,4 +1,3 @@
-
 """
 マルチエージェントバックエンド
 
@@ -79,24 +78,16 @@ SELECT文のみを生成し、LIMIT句を含めてください。"""),
             if len(rows) == 0:
                 return "結果が0件でした。"
             
-            result_text = f"
-📊 分析結果（上位{len(rows)}件）:
-
-"
+            result_text = f"📊 分析結果（上位{len(rows)}件）:\n\n"
             headers = result_df.columns
-            result_text += " | ".join(headers) + "
-"
-            result_text += "-" * 60 + "
-"
+            result_text += " | ".join(headers) + "\n"
+            result_text += "-" * 60 + "\n"
             
             for row in rows:
-                result_text += " | ".join([str(val) for val in row]) + "
-"
+                result_text += " | ".join([str(val) for val in row]) + "\n"
             
             total_count = result_df.count()
-            result_text += f"
-📈 総レコード数: {total_count:,}
-"
+            result_text += f"\n📈 総レコード数: {total_count:,}\n"
             
             return result_text
         except Exception as e:
@@ -105,10 +96,7 @@ SELECT文のみを生成し、LIMIT句を含めてください。"""),
     def format_response(self, question: str, sql_result: str) -> str:
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", """SQL分析結果を日本語でわかりやすく要約してください。マーケティング示唆を含めて3-5段落で。"""),
-            ("user", "質問: {question}
-
-結果:
-{sql_result}")
+            ("user", "質問: {question}\n\n結果:\n{sql_result}")
         ])
         
         chain = summary_prompt | self.llm
@@ -138,10 +126,7 @@ class RAGAgent:
             if len(docs) == 0:
                 return "関連フィードバックが見つかりませんでした。"
             
-            context_text = "
-📝 関連する顧客フィードバック:
-
-"
+            context_text = "📝 関連する顧客フィードバック:\n\n"
             
             for i, doc in enumerate(docs, 1):
                 feedback_type = doc[0] if len(doc) > 0 else "不明"
@@ -150,11 +135,8 @@ class RAGAgent:
                 feedback_text = doc[3] if len(doc) > 3 else "不明"
                 sentiment = doc[4] if len(doc) > 4 else "不明"
                 
-                context_text += f"{i}. [{feedback_type}] {feedback_text}
-"
-                context_text += f"   カテゴリ: {category} | ブランド: {brand} | 感情: {sentiment}
-
-"
+                context_text += f"{i}. [{feedback_type}] {feedback_text}\n"
+                context_text += f"   カテゴリ: {category} | ブランド: {brand} | 感情: {sentiment}\n\n"
             
             return context_text
         except Exception as e:
@@ -165,9 +147,7 @@ class RAGAgent:
         
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", """顧客フィードバックを分析し、マーケティング示唆を提供してください。3-5段落で。"""),
-            ("user", "質問: {question}
-
-{search_results}")
+            ("user", "質問: {question}\n\n{search_results}")
         ])
         
         chain = summary_prompt | self.llm
@@ -213,26 +193,20 @@ def initialize_agents(catalog: str, schema: str, vector_search_endpoint: str, ll
         sql_result = sql_agent.analyze(state["question"])
         formatted_result = sql_agent.format_response(state["question"], sql_result)
         state["sql_result"] = formatted_result
-        state["messages"].append(AIMessage(content=f"[SQL完了]
-{formatted_result}"))
+        state["messages"].append(AIMessage(content=f"[SQL完了]\n{formatted_result}"))
         return state
     
     def rag_analysis_node(state: AgentState) -> AgentState:
         rag_result = rag_agent.analyze(state["question"])
         state["rag_result"] = rag_result
-        state["messages"].append(AIMessage(content=f"[RAG完了]
-{rag_result}"))
+        state["messages"].append(AIMessage(content=f"[RAG完了]\n{rag_result}"))
         return state
     
     def synthesize_node(state: AgentState) -> AgentState:
         synthesizer_llm = ChatDatabricks(endpoint=llm_endpoint, temperature=0.3, max_tokens=3000)
         synthesis_prompt = ChatPromptTemplate.from_messages([
             ("system", """SQL分析とRAG分析を統合し、包括的な回答を提供してください。5-8段落で。"""),
-            ("user", "質問: {question}
-
-SQL: {sql_result}
-
-RAG: {rag_result}")
+            ("user", "質問: {question}\n\nSQL: {sql_result}\n\nRAG: {rag_result}")
         ])
         
         chain = synthesis_prompt | synthesizer_llm
@@ -243,8 +217,7 @@ RAG: {rag_result}")
         })
         
         state["final_answer"] = response.content
-        state["messages"].append(AIMessage(content=f"[統合完了]
-{response.content}"))
+        state["messages"].append(AIMessage(content=f"[統合完了]\n{response.content}"))
         return state
     
     def should_use_sql(state: AgentState) -> str:
