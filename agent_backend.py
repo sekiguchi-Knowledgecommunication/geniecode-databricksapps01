@@ -47,16 +47,12 @@ class SQLAnalysisAgent:
         self.schema = schema
         self.warehouse_id = warehouse_id
         self.llm = ChatDatabricks(endpoint=llm_endpoint, temperature=0.1, max_tokens=2000)
-        
-        # Databricks認証情報を環境変数から取得
-        self.hostname = os.getenv("DATABRICKS_HOST")
-        self.http_path = f"/sql/1.0/warehouses/{warehouse_id}"
     
     def _execute_sql(self, sql_query: str):
         """SQL Warehouseでクエリを実行"""
+        # Databricks Apps環境では、認証情報が自動的に環境変数から取得される
         with sql.connect(
-            server_hostname=self.hostname,
-            http_path=self.http_path
+            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}"
         ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(sql_query)

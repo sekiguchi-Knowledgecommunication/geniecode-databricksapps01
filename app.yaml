@@ -7,7 +7,5 @@ resources:
       cluster_size: MEDIUM
 
 env:
-  - name: DATABRICKS_HOST
-    value: "{{workspace.host}}"
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "{{resources.sql_warehouses.default.id}}"
+    valueFrom: $.resources.sql_warehouses.default.id
