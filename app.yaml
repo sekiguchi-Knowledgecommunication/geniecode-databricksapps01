@@ -1,1 +1,13 @@
 command: ["python", "app.py"]
+
+resources:
+  sql_warehouses:
+    - name: default
+      warehouse_type: PRO
+      cluster_size: MEDIUM
+
+env:
+  - name: DATABRICKS_HOST
+    value: "{{workspace.host}}"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "{{resources.sql_warehouses.default.id}}"

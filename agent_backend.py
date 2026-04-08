@@ -5,20 +5,19 @@
 Gradioアプリ（app.py）から呼び出されます。
 """
 
+import os
 from typing import TypedDict, Annotated, Sequence, Generator, Dict, Any
 from operator import add
 from dataclasses import dataclass
 
 from databricks.vector_search.client import VectorSearchClient
 from databricks.sdk import WorkspaceClient
+from databricks import sql
 
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_community.chat_models import ChatDatabricks
 from langchain_core.prompts import ChatPromptTemplate
-
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
 
 
 @dataclass
@@ -43,11 +42,25 @@ class AgentState(TypedDict):
 class SQLAnalysisAgent:
     """構造化データのSQL分析エージェント"""
     
-    def __init__(self, catalog: str, schema: str, llm_endpoint: str):
+    def __init__(self, catalog: str, schema: str, warehouse_id: str, llm_endpoint: str):
         self.catalog = catalog
         self.schema = schema
-        self.spark = SparkSession.builder.getOrCreate()
+        self.warehouse_id = warehouse_id
         self.llm = ChatDatabricks(endpoint=llm_endpoint, temperature=0.1, max_tokens=2000)
+        
+        # Databricks認証情報を環境変数から取得
+        self.hostname = os.getenv("DATABRICKS_HOST")
+        self.http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+    
+    def _execute_sql(self, sql_query: str):
+        """SQL Warehouseでクエリを実行"""
+        with sql.connect(
+            server_hostname=self.hostname,
+            http_path=self.http_path
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(sql_query)
+                return cursor.fetchall(), [desc[0] for desc in cursor.description]
     
     def analyze(self, question: str) -> str:
         schema_info = f"""
@@ -72,22 +85,19 @@ SELECT文のみを生成し、LIMIT句を含めてください。"""),
         sql_query = response.content.strip().replace("```sql", "").replace("```", "").strip()
         
         try:
-            result_df = self.spark.sql(sql_query)
-            rows = result_df.limit(20).collect()
+            rows, headers = self._execute_sql(sql_query)
             
             if len(rows) == 0:
                 return "結果が0件でした。"
             
             result_text = f"📊 分析結果（上位{len(rows)}件）:\n\n"
-            headers = result_df.columns
             result_text += " | ".join(headers) + "\n"
             result_text += "-" * 60 + "\n"
             
-            for row in rows:
+            for row in rows[:20]:
                 result_text += " | ".join([str(val) for val in row]) + "\n"
             
-            total_count = result_df.count()
-            result_text += f"\n📈 総レコード数: {total_count:,}\n"
+            result_text += f"\n📈 総レコード数: {len(rows):,}\n"
             
             return result_text
         except Exception as e:
@@ -155,11 +165,11 @@ class RAGAgent:
         return response.content
 
 
-def initialize_agents(catalog: str, schema: str, vector_search_endpoint: str, llm_endpoint: str) -> Dict[str, Any]:
+def initialize_agents(catalog: str, schema: str, warehouse_id: str, llm_endpoint: str) -> Dict[str, Any]:
     """エージェントシステムを初期化"""
     
     # SQL分析エージェント
-    sql_agent = SQLAnalysisAgent(catalog, schema, llm_endpoint)
+    sql_agent = SQLAnalysisAgent(catalog, schema, warehouse_id, llm_endpoint)
     
     # RAGエージェント
     index_name = f"{catalog}.{schema}.confectionery_feedback_index"

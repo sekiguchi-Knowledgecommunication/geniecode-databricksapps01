@@ -16,10 +16,16 @@ def initialize_app():
     global agent_system
     if agent_system is None:
         print("🚀 エージェント初期化中...")
+        
+        # SQL Warehouse IDを環境変数から取得
+        warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+        if not warehouse_id:
+            raise ValueError("DATABRICKS_WAREHOUSE_ID環境変数が設定されていません")
+        
         agent_system = initialize_agents(
             catalog="workspace",
             schema="confectionery_survey_demo",
-            vector_search_endpoint="confectionery_survey_vs_endpoint",
+            warehouse_id=warehouse_id,
             llm_endpoint="databricks-meta-llama-3-3-70b-instruct"
         )
         print("✅ 完了")
