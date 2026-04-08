@@ -117,9 +117,15 @@ SELECT文のみを生成し、LIMIT句を含めてください。"""),
 class RAGAgent:
     """Vector Search RAGエージェント"""
     
-    def __init__(self, index_name: str, llm_endpoint: str):
+    def __init__(self, index_name: str, llm_endpoint: str, workspace_client: WorkspaceClient):
         self.index_name = index_name
-        self.vsc = VectorSearchClient(disable_notice=True)
+        self.workspace_client = workspace_client
+        
+        # WorkspaceClientを使ってVector Searchクライアントを初期化
+        self.vsc = VectorSearchClient(
+            workspace_client=workspace_client,
+            disable_notice=True
+        )
         self.index = self.vsc.get_index(index_name=index_name)
         self.llm = ChatDatabricks(endpoint=llm_endpoint, temperature=0.3, max_tokens=2000)
     
@@ -168,12 +174,15 @@ class RAGAgent:
 def initialize_agents(catalog: str, schema: str, warehouse_id: str, llm_endpoint: str) -> Dict[str, Any]:
     """エージェントシステムを初期化"""
     
+    # WorkspaceClientを作成（アプリの認証情報を自動取得）
+    workspace_client = WorkspaceClient()
+    
     # SQL分析エージェント
     sql_agent = SQLAnalysisAgent(catalog, schema, warehouse_id, llm_endpoint)
     
-    # RAGエージェント
+    # RAGエージェント（WorkspaceClientを渡す）
     index_name = f"{catalog}.{schema}.confectionery_feedback_index"
-    rag_agent = RAGAgent(index_name, llm_endpoint)
+    rag_agent = RAGAgent(index_name, llm_endpoint, workspace_client)
     
     # LangGraphルーター構築
     def route_question(state: AgentState) -> AgentState:
