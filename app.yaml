@@ -1,9 +1,1 @@
 command: ["python", "app.py"]
-env:
-  - name: DATABRICKS_HOST
-    valueFrom: $.resources.sql_warehouses.default.jdbc_url
-resources:
-  sql_warehouses:
-    - name: default
-      warehouse_type: PRO
-      cluster_size: MEDIUM
